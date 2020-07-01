@@ -137,6 +137,7 @@ def parser(record):
     # parse a TF message to a sample
     parsed = tf.parse_single_example(record, keys_to_features)
     # decode image, label
+    # numpy string. eg. image_raw = numpy_array.tostring()
     image = tf.decode_raw(parsed['image_raw'], tf.uint8)
     image = tf.cast(image, tf.float32)
     label = tf.cast(parsed['label'], tf.int32)
