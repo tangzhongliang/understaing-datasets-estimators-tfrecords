@@ -169,7 +169,7 @@ def main(unused_argv):
         train_dataset = train_dataset.batch(FLAGS.batch_size)
         # The returned iterator will be initialized automatically.
         train_iterator = train_dataset.make_one_shot_iterator()
-        
+        # should reuse dataset
         features, labels = train_iterator.get_next()
         return features, labels
 
@@ -198,4 +198,5 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
+    # arg main: 运行函数 默认是main
     tf.app.run()
