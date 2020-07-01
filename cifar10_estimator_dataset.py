@@ -85,15 +85,19 @@ def cifar_model_fn(features, labels, mode):
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
     # Loss for train and eval
+    # onehost for cross_entropy
     onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=10)
     # print('onehot_labels', onehot_labels.shape)
     loss = tf.losses.softmax_cross_entropy(onehot_labels, logits, scope='LOSS')
     # print(labels.shape, predictions['classes'].shape)
     
+    # accuracy in whole train duration
     accuracy, update_op = tf.metrics.accuracy(
         labels=labels, predictions=predictions['classes'], name='accuracy')
+    # accuracy in current batch
     batch_acc = tf.reduce_mean(tf.cast(
         tf.equal(tf.cast(labels, tf.int64), predictions['classes']), tf.float32))
+    # summary batch change
     tf.summary.scalar('batch_acc', batch_acc)
     tf.summary.scalar('streaming_acc', update_op)
     # tf.summary.scalar('accuracy', accuracy)
@@ -107,9 +111,13 @@ def cifar_model_fn(features, labels, mode):
         #     'Accuracy': accuracy,
         #     'My accuracy': my_acc}
         # logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
+        # get all update ops in current graph
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         optimizer = tf.train.RMSPropOptimizer(learning_rate=FLAGS.learning_rate)
+        # A list of Operation or Tensor objects which must be executed or computed before running the operations defined in the context. 
+        # ensure update ops have been completed
         with tf.control_dependencies(update_ops):
+            # tell optimizer the train's epoch which is used to set learning_rate
             train_op = optimizer.minimize(
                 loss=loss, global_step=tf.train.get_global_step())
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
@@ -121,11 +129,14 @@ def cifar_model_fn(features, labels, mode):
 
 
 def parser(record):
+    
     keys_to_features = {
         'image_raw': tf.FixedLenFeature((), tf.string),
         'label': tf.FixedLenFeature((), tf.int64)
     }
+    # parse a TF message to a sample
     parsed = tf.parse_single_example(record, keys_to_features)
+    # decode image, label
     image = tf.decode_raw(parsed['image_raw'], tf.uint8)
     image = tf.cast(image, tf.float32)
     label = tf.cast(parsed['label'], tf.int32)
@@ -149,11 +160,16 @@ def main(unused_argv):
 
     def train_input_fn():
         train_dataset = tf.data.TFRecordDataset(FLAGS.train_dataset)
+        # set parser for tfrecord message
         train_dataset = train_dataset.map(parser)
+        # shuffle sample 
+        # dataset = dataset.shuffle(>=sample_count, reshuffle_each_iteration=True)
+
         train_dataset = train_dataset.repeat(FLAGS.num_epochs)
         train_dataset = train_dataset.batch(FLAGS.batch_size)
+        # The returned iterator will be initialized automatically.
         train_iterator = train_dataset.make_one_shot_iterator()
-
+        
         features, labels = train_iterator.get_next()
         return features, labels
 
